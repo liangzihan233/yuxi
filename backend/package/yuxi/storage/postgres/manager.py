@@ -14,7 +14,7 @@ from yuxi.utils import logger
 
 from server.utils.singleton import SingletonMeta
 
-# 合并两个 Base
+# 合并所有 Base（interview 模型共用 BusinessBase，无需额外合并）
 CombinedBase = declarative_base()
 
 # 继承所有表
@@ -94,12 +94,12 @@ class PostgresManager(metaclass=SingletonMeta):
             raise RuntimeError("PostgreSQL manager not initialized. Please check configuration.")
 
     async def create_tables(self):
-        """创建所有表（知识库和业务表）"""
+        """创建所有表（知识库、业务和访谈表）"""
         self._check_initialized()
         async with self.async_engine.begin() as conn:
             await conn.run_sync(KnowledgeBase.metadata.create_all)
             await conn.run_sync(BusinessBase.metadata.create_all)
-        logger.info("PostgreSQL tables created/checked (knowledge + business)")
+        logger.info("PostgreSQL tables created/checked (knowledge + business + interview)")
 
     async def create_business_tables(self):
         """创建所有业务数据表"""

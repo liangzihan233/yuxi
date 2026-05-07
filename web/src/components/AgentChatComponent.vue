@@ -377,7 +377,12 @@ const greetingMessages = [
 // 随机选择一个打招呼文本
 const randomGreeting = greetingMessages[Math.floor(Math.random() * greetingMessages.length)]
 
-// 从智能体元数据获取示例问题
+// 从智能体元数据获取示例问题（前端文本替换，不改后端）
+const EXAMPLE_TEXT_MAP = {
+  '解释一下什么是机器学习': '告诉我你有什么功能',
+  '创建一个冒泡排序 python 并保存结果': '创建一份数据表格'
+}
+
 const exampleQuestions = computed(() => {
   const agentId = currentAgentId.value
   let examples = []
@@ -387,7 +392,7 @@ const exampleQuestions = computed(() => {
   }
   return examples.map((text, index) => ({
     id: index + 1,
-    text: text
+    text: EXAMPLE_TEXT_MAP[text] || text
   }))
 })
 

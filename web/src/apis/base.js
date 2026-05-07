@@ -17,13 +17,14 @@ import { message } from 'ant-design-vue'
 export async function apiRequest(url, options = {}, requiresAuth = true, responseType = 'json') {
   try {
     const isFormData = options?.body instanceof FormData
+    // 构建 headers：FormData 时移除手动设置的 Content-Type，让浏览器自动带 boundary
+    const baseHeaders = isFormData
+      ? (() => { const { 'Content-Type': _, ...rest } = options.headers || {}; return rest })()
+      : { 'Content-Type': 'application/json', ...options.headers }
     // 默认请求配置
     const requestOptions = {
       ...options,
-      headers: {
-        ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
-        ...options.headers
-      }
+      headers: baseHeaders
     }
 
     // 如果需要认证，添加认证头

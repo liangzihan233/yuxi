@@ -65,6 +65,25 @@ const router = createRouter({
       ]
     },
     {
+      path: '/project',
+      name: 'project',
+      component: AppLayout,
+      children: [
+        {
+          path: '',
+          name: 'ProjectList',
+          component: () => import('../views/ProjectListView.vue'),
+          meta: { keepAlive: true, requiresAuth: true, requiresAdmin: true }
+        },
+        {
+          path: ':project_id',
+          name: 'ProjectDetail',
+          component: () => import('../views/ProjectDetailView.vue'),
+          meta: { keepAlive: false, requiresAuth: true, requiresAdmin: true }
+        }
+      ]
+    },
+    {
       path: '/database',
       name: 'database',
       component: AppLayout,

@@ -192,6 +192,67 @@ def _convert_docx_with_python_docx(file_path: Path) -> str:
     return "\n\n".join(blocks).strip()
 
 
+def _convert_excel_with_openpyxl(file_path: Path) -> str:
+    """使用 openpyxl (.xlsx) 或 xlrd (.xls) 解析 Excel 文件（Docling 失败时兜底），输出 Markdown 表格。"""
+    file_ext = file_path.suffix.lower()
+    blocks: list[str] = []
+
+    if file_ext == ".xlsx":
+        from openpyxl import load_workbook
+
+        wb = load_workbook(str(file_path), read_only=True, data_only=True)
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            blocks.append(f"## {sheet_name}")
+
+            rows_data: list[list[str]] = []
+            for row in ws.iter_rows(values_only=True):
+                cells = [str(cell) if cell is not None else "" for cell in row]
+                if any(cells):
+                    rows_data.append(cells)
+
+            if not rows_data:
+                blocks.append("")
+                continue
+
+            max_cols = len(rows_data[0])
+            for i, row in enumerate(rows_data):
+                if len(row) < max_cols:
+                    rows_data[i] = row + [""] * (max_cols - len(row))
+
+            header = rows_data[0]
+            blocks.append(f"| {' | '.join(header)} |")
+            blocks.append(f"| {' | '.join(['---'] * max_cols)} |")
+            for row in rows_data[1:]:
+                blocks.append(f"| {' | '.join(row[:max_cols])} |")
+            blocks.append("")
+
+        wb.close()
+
+    elif file_ext == ".xls":
+        import xlrd
+
+        wb = xlrd.open_workbook(str(file_path))
+        for sheet in wb.sheets():
+            blocks.append(f"## {sheet.name}")
+
+            if sheet.nrows == 0:
+                blocks.append("")
+                continue
+
+            max_cols = sheet.ncols
+            for row_idx in range(sheet.nrows):
+                cells = [str(sheet.cell_value(row_idx, col_idx)) if sheet.cell_type(row_idx, col_idx) != xlrd.XL_CELL_EMPTY else "" for col_idx in range(max_cols)]
+                if row_idx == 0:
+                    blocks.append(f"| {' | '.join(cells)} |")
+                    blocks.append(f"| {' | '.join(['---'] * max_cols)} |")
+                else:
+                    blocks.append(f"| {' | '.join(cells)} |")
+            blocks.append("")
+
+    return "\n".join(blocks).strip()
+
+
 def pdfreader(file_path, params=None):
     """读取 PDF 文件并返回 text 文本。"""
     if isinstance(file_path, str):
@@ -363,7 +424,11 @@ async def _process_file_to_markdown_core(
             result = markdown_content.strip()
 
         elif file_ext in [".xls", ".xlsx"]:
-            result = _convert_with_docling(file_path_obj, params=params)
+            try:
+                result = _convert_with_docling(file_path_obj, params=params)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"Docling 解析 Excel 失败，回退到 openpyxl: {file_path_obj.name}, {e}")
+                result = _convert_excel_with_openpyxl(file_path_obj)
 
         elif file_ext == ".json":
             import json

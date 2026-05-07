@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, computed, provide } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { GithubOutlined } from '@ant-design/icons-vue'
-import { Bot, LibraryBig, BarChart3, ClipboardList, Blocks } from 'lucide-vue-next'
+import { Bot, LibraryBig, BarChart3, ClipboardList, Blocks, Mic } from 'lucide-vue-next'
 
 import { useConfigStore } from '@/stores/config'
 import { useDatabaseStore } from '@/stores/database'
@@ -112,6 +112,13 @@ const mainList = computed(() => {
   ]
 
   if (userStore.isAdmin) {
+    items.push({
+      name: '访谈调研',
+      path: '/project',
+      icon: Mic,
+      activeIcon: Mic
+    })
+
     if (!isLiteMode) {
       items.push({
         name: '知识库',
@@ -183,17 +190,7 @@ provide('settingsModal', {
         </RouterLink>
       </div>
       <div class="fill"></div>
-      <div class="github nav-item">
-        <a-tooltip placement="right">
-          <template #title>欢迎 Star</template>
-          <a href="https://github.com/xerrors/Yuxi" target="_blank" class="github-link">
-            <GithubOutlined class="icon" />
-            <span v-if="githubStars > 0" class="github-stars">
-              <span class="star-count">{{ (githubStars / 1000).toFixed(1) }}k</span>
-            </span>
-          </a>
-        </a-tooltip>
-      </div>
+      <!-- GitHub Star 已移除 -->
       <div
         v-if="userStore.isAdmin"
         class="nav-item task-center"
