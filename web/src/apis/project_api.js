@@ -198,11 +198,6 @@ export const interviewApi = {
    * 创建访谈记录
    * @param {number} projectId - 项目ID
    * @param {Object} data - 访谈数据
-   * @param {string} data.name - 访谈名称
-   * @param {string} [data.valid_from] - 有效开始时间
-   * @param {string} [data.valid_until] - 有效结束时间
-   * @param {number} [data.max_participants] - 最大参与人数
-   * @param {number[]} data.linked_flows - 关联的流程ID列表
    * @returns {Promise<Object>} 创建的访谈记录
    */
   createInterview: (projectId, data) => {
@@ -210,12 +205,43 @@ export const interviewApi = {
   },
 
   /**
-   * 获取项目的访谈记录列表
+   * 获取项目的访谈记录列表（分页+筛选）
+   * @param {number} projectId - 项目ID
+   * @param {Object} params - 查询参数
+   * @param {string} [params.status] - 状态筛选
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.pageSize=10] - 每页数量
+   * @returns {Promise<Object>} { items: Array, total: number }
+   */
+  listInterviewsPaginated: (projectId, { status, page = 1, pageSize = 10, interviewId } = {}) => {
+    const params = new URLSearchParams()
+    if (status) params.set('status', status)
+    if (interviewId) params.set('parent_interview_id', interviewId)
+    params.set('page', page)
+    params.set('page_size', pageSize)
+    return apiAdminGet(`${BASE_URL}/${projectId}/interviews?${params.toString()}`)
+  },
+
+  /**
+   * 获取项目的访谈记录列表（不分页，兼容旧接口）
    * @param {number} projectId - 项目ID
    * @returns {Promise<Array>} 访谈记录列表
    */
   listInterviews: (projectId) => {
-    return apiAdminGet(`${BASE_URL}/${projectId}/interviews`)
+    return apiAdminGet(`${BASE_URL}/${projectId}/interviews?page_size=1000`).then(res => {
+      // 兼容：后端返回 {items, total}，旧接口期望数组
+      if (Array.isArray(res)) return res
+      return res.items || []
+    })
+  },
+
+  /**
+   * 获取项目访谈统计数据
+   * @param {number} projectId - 项目ID
+   * @returns {Promise<Object>} { total, pending, in_progress, completed, analyzing, archived, remaining_seconds }
+   */
+  getInterviewStats: (projectId) => {
+    return apiAdminGet(`${BASE_URL}/${projectId}/interviews/stats`)
   },
 
   /**
@@ -229,6 +255,37 @@ export const interviewApi = {
   },
 
   /**
+   * 更新访谈状态
+   * @param {number} projectId - 项目ID
+   * @param {number} interviewId - 访谈ID
+   * @param {string} status - 新状态
+   * @returns {Promise<Object>} 更新结果
+   */
+  updateInterviewStatus: (projectId, interviewId, status) => {
+    return apiAdminPut(`${BASE_URL}/${projectId}/interviews/${interviewId}/status`, { status })
+  },
+
+  /**
+   * 访谈记录入库
+   * @param {number} projectId - 项目ID
+   * @param {number} interviewId - 访谈ID
+   * @returns {Promise<Object>} 入库结果
+   */
+  archiveInterview: (projectId, interviewId) => {
+    return apiAdminPost(`${BASE_URL}/${projectId}/interviews/${interviewId}/archive`)
+  },
+
+  /**
+   * 分析访谈记录
+   * @param {number} projectId - 项目ID
+   * @param {number} interviewId - 访谈ID
+   * @returns {Promise<Object>} 分析后的访谈记录
+   */
+  analyzeInterview: (projectId, interviewId) => {
+    return apiAdminPost(`${BASE_URL}/${projectId}/interviews/${interviewId}/analyze`)
+  },
+
+  /**
    * 删除访谈记录
    * @param {number} projectId - 项目ID
    * @param {number} interviewId - 访谈ID
@@ -236,5 +293,34 @@ export const interviewApi = {
    */
   deleteInterview: (projectId, interviewId) => {
     return apiAdminDelete(`${BASE_URL}/${projectId}/interviews/${interviewId}`)
-  }
+  },
+
+  /**
+   * 导出访谈记录文本
+   * @param {number} projectId - 项目ID
+   * @param {number} interviewId - 访谈ID
+   * @returns {Promise<Blob>} 文本文件
+   */
+  exportInterviewTranscript: async (projectId, interviewId) => {
+    const response = await apiAdminGet(`${BASE_URL}/${projectId}/interviews/${interviewId}/export`, {}, 'blob')
+    return response
+  },
+
+  /**
+   * 受访者端：根据 token 获取访谈信息
+   */
+  getByToken: (token) => apiGet(`/api/interviews/by-token/${token}`, {}, false),
+
+  /**
+   * 受访者端：获取 RTC 配置并启动访谈
+   */
+  getRtcConfig: (interviewId) => apiPost(`/api/interviews/${interviewId}/rtc-config`, {}, {}, false),
+
+  /**
+   * 受访者端：结束访谈并保存实时记录
+   */
+  stopInterview: (interviewId, transcript = [], sessionUuid = '') => apiPost(`/api/interviews/${interviewId}/stop`, {
+    transcript,
+    session_uuid: sessionUuid || undefined
+  }, {}, false)
 }

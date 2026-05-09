@@ -8,6 +8,7 @@ from server.routers.dashboard_router import dashboard
 from server.routers.department_router import department
 from server.routers.mcp_router import mcp
 from server.routers.project_router import projects_router
+from server.routers.interview_room_router import interview_room_router
 from server.routers.skill_router import skills
 from server.routers.subagent_router import subagents_router
 from server.routers.system_router import system
@@ -29,6 +30,7 @@ router.include_router(chat)  # /api/chat/* 对话、消息流、运行态
 router.include_router(dashboard)  # /api/dashboard/* 仪表盘聚合数据
 router.include_router(department)  # /api/departments/* 部门与权限相关数据
 router.include_router(projects_router)  # /api/projects/* 项目管理与访谈
+router.include_router(interview_room_router)  # /api/interviews/* 语音访谈房间
 router.include_router(tasks)  # /api/tasks/* 后台任务查询与管理
 router.include_router(mcp)  # /api/system/mcp-servers/* MCP 服务管理
 router.include_router(skills)  # /api/system/skills/* Skills 管理

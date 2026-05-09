@@ -41,6 +41,7 @@ defineProps({
 
 <style scoped lang="less">
 .header-container {
+  width: 100%;
   background-color: var(--bg-sider);
   backdrop-filter: blur(10px);
   padding: 8px 16px;

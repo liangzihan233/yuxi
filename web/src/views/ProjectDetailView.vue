@@ -236,7 +236,7 @@
               <p>暂无访谈记录，点击「生成访谈链接」创建</p>
             </div>
             <div v-else class="interview-list">
-              <div v-for="interview in interviews" :key="interview.id" class="interview-item">
+              <div v-for="interview in displayedInterviews" :key="interview.id" class="interview-item">
                 <div class="interview-info">
                   <div class="interview-name-row">
                     <span class="interview-name">{{ interview.name || '访谈 #' + interview.id }}</span>
@@ -262,6 +262,22 @@
                   </div>
                 </div>
                 <div class="interview-actions">
+                  <a-tooltip title="查看访谈列表">
+                    <a-button type="text" size="small" @click.stop="goToInterviewList(interview)">
+                      <EyeOutlined />
+                    </a-button>
+                  </a-tooltip>
+                  <a-tooltip :title="interview.status === 'archived' ? '该访谈已入库' : interview.status === 'completed' ? '入库' : '仅已完成访谈可入库'">
+                    <a-button
+                      type="text"
+                      size="small"
+                      :disabled="interview.status !== 'completed'"
+                      :loading="archivingInterviewId === interview.id"
+                      @click.stop="handleArchiveInterview(interview)"
+                    >
+                      入库
+                    </a-button>
+                  </a-tooltip>
                   <a-tooltip title="复制链接">
                     <a-button type="text" size="small" @click="handleCopyLink(interview)">
                       <CopyOutlined />
@@ -500,18 +516,20 @@
       centered
     >
       <div class="qr-code-container">
-        <div class="qr-code-placeholder">
-          <QrcodeOutlined :size="120" style="color: var(--gray-400)" />
-          <p class="qr-code-url">{{ currentInterview ? getInterviewLink(currentInterview) : '' }}</p>
+        <div class="qr-code-image-wrapper">
+          <img v-if="qrCodeDataUrl" :src="qrCodeDataUrl" alt="访谈二维码" class="qr-code-img" />
+          <a-spin v-else />
         </div>
-        <p class="qr-code-hint">（二维码功能开发中，当前为占位展示）</p>
+        <p class="qr-code-url">{{ currentInterview ? getInterviewLink(currentInterview) : '' }}</p>
+        <p class="qr-code-hint">扫描上方二维码即可进入访谈页面</p>
       </div>
     </a-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, nextTick, computed } from 'vue'
+import QRCode from 'qrcode'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -534,7 +552,8 @@ import {
   ThunderboltOutlined,
   LinkOutlined,
   CopyOutlined,
-  QrcodeOutlined
+  QrcodeOutlined,
+  EyeOutlined
 } from '@ant-design/icons-vue'
 import { projectApi, flowApi, interviewApi } from '@/apis/project_api'
 import HeaderComponent from '@/components/HeaderComponent.vue'
@@ -549,6 +568,7 @@ const loading = ref(false)
 const project = ref(null)
 const flows = ref([])
 const interviews = ref([])
+const archivingInterviewId = ref(null)
 
 // 上传相关
 const uploading = ref(false)
@@ -608,6 +628,7 @@ const confirmedFlows = ref([])
 // 二维码弹窗
 const qrCodeVisible = ref(false)
 const currentInterview = ref(null)
+const qrCodeDataUrl = ref('')
 
 // 状态映射
 const statusLabelMap = { draft: '草稿', active: '进行中', completed: '已完成', archived: '已归档' }
@@ -616,8 +637,14 @@ const statusColorMap = { draft: 'default', active: 'green', completed: 'blue', a
 const flowStatusLabel = { draft: '草稿', confirmed: '已确认', active: '进行中' }
 const flowStatusColor = { draft: 'default', confirmed: 'green', active: 'blue' }
 
-const interviewStatusLabel = { pending: '待开始', in_progress: '进行中', completed: '已完成', analyzing: '分析中' }
-const interviewStatusColor = { pending: 'default', in_progress: 'processing', completed: 'green', analyzing: 'purple' }
+const interviewStatusLabel = { pending: '待开始', in_progress: '进行中', completed: '已完成', analyzing: '分析中', archived: '已入库' }
+const interviewStatusColor = { pending: 'default', in_progress: 'processing', completed: 'green', analyzing: 'purple', archived: 'orange' }
+
+const nowTick = ref(Date.now())
+const displayedInterviews = computed(() => interviews.value.map(interview => ({
+  ...interview,
+  status: resolveInterviewStatus(interview)
+})))
 
 // 流程类型映射
 const flowTypeLabel = { chat: '杂谈', questionnaire: '问卷', test: '测试' }
@@ -629,6 +656,29 @@ const formatTime = (timeStr) => {
   return parsed ? parsed.format('YYYY-MM-DD HH:mm') : ''
 }
 
+const resolveInterviewStatus = (interview) => {
+  void nowTick.value
+  if (!interview) return 'pending'
+
+  const isParentInterview = !interview.parent_interview_id
+  if (isParentInterview) {
+    if ((interview.session_count || 0) >= Math.max(interview.max_participants || 1, 1)) return 'completed'
+    if (interview.status === 'archived') return 'archived'
+    if (interview.status === 'analyzing') return 'analyzing'
+  } else if (interview.status === 'analyzing' || interview.status === 'archived') {
+    return interview.status
+  }
+
+  const now = dayjs()
+  const validFrom = interview.valid_from ? parseToShanghai(interview.valid_from) : null
+  const validUntil = interview.valid_until ? parseToShanghai(interview.valid_until) : null
+
+  if (validFrom && validFrom.isAfter(now)) return 'pending'
+  if ((interview.session_count || 0) >= Math.max(interview.max_participants || 1, 1)) return 'completed'
+  if (validUntil && !validUntil.isAfter(now)) return 'completed'
+  return 'in_progress'
+}
+
 const getDocumentName = (url) => {
   if (!url) return ''
   const parts = url.split('/')
@@ -637,6 +687,11 @@ const getDocumentName = (url) => {
 
 const goBack = () => {
   router.push('/project')
+}
+
+const goToInterviewList = (interview = null) => {
+  const query = interview?.id ? { interview_id: String(interview.id) } : undefined
+  router.push({ path: `/project/${projectId.value}/interviews`, query })
 }
 
 // 加载数据
@@ -895,9 +950,10 @@ const getFlowName = (flowId) => {
   return flow ? flow.name : `流程 #${flowId}`
 }
 
-/** 生成假访谈链接 */
+/** 生成访谈链接 */
 const getInterviewLink = (interview) => {
-  return `https://interview.example.com/i/${interview.id}`
+  const origin = window.location.origin
+  return `${origin}/interview/${interview.interview_token || interview.id}`
 }
 
 /** 时间禁用：结束日期不可早于开始日期，且跨度不超过一个月 */
@@ -994,9 +1050,26 @@ const handleCopyLink = async (interview) => {
 }
 
 /** 显示二维码弹窗 */
-const handleShowQrCode = (interview) => {
+const handleShowQrCode = async (interview) => {
   currentInterview.value = interview
+  qrCodeDataUrl.value = ''
   qrCodeVisible.value = true
+  // 等待弹窗渲染后生成二维码
+  await nextTick()
+  try {
+    const link = getInterviewLink(interview)
+    qrCodeDataUrl.value = await QRCode.toDataURL(link, {
+      width: 240,
+      margin: 2,
+      color: {
+        dark: '#1a1a1a',
+        light: '#ffffff'
+      }
+    })
+  } catch (err) {
+    console.error('生成二维码失败:', err)
+    message.error('二维码生成失败')
+  }
 }
 
 /** 删除访谈记录 */
@@ -1007,6 +1080,20 @@ const handleDeleteInterview = async (interview) => {
     await loadProject()
   } catch (error) {
     message.error('删除失败: ' + (error.message || '未知错误'))
+  }
+}
+
+const handleArchiveInterview = async (interview) => {
+  if (!interview?.id || interview.status !== 'completed') return
+  archivingInterviewId.value = interview.id
+  try {
+    await interviewApi.archiveInterview(projectId.value, interview.id)
+    message.success('访谈记录已入库')
+    await loadProject()
+  } catch (error) {
+    message.error('入库失败: ' + (error.message || '未知错误'))
+  } finally {
+    archivingInterviewId.value = null
   }
 }
 
@@ -1026,6 +1113,9 @@ onMounted(() => {
   if (route.params.project_id) {
     projectId.value = parseInt(route.params.project_id)
   }
+  setInterval(() => {
+    nowTick.value = Date.now()
+  }, 60000)
 })
 </script>
 
@@ -1423,27 +1513,35 @@ onMounted(() => {
   align-items: center;
   padding: 16px 0;
 
-  .qr-code-placeholder {
+  .qr-code-image-wrapper {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 16px;
-    padding: 32px;
-    border: 2px dashed var(--gray-200);
+    justify-content: center;
+    width: 240px;
+    height: 240px;
+    padding: 8px;
+    border: 1px solid var(--gray-200);
     border-radius: 12px;
-    background: var(--gray-25);
+    background: #fff;
 
-    .qr-code-url {
-      font-size: 12px;
-      color: var(--gray-500);
-      word-break: break-all;
-      text-align: center;
-      max-width: 280px;
+    .qr-code-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
   }
 
-  .qr-code-hint {
+  .qr-code-url {
     margin-top: 12px;
+    font-size: 11px;
+    color: var(--gray-500);
+    word-break: break-all;
+    text-align: center;
+    max-width: 280px;
+  }
+
+  .qr-code-hint {
+    margin-top: 8px;
     font-size: 12px;
     color: var(--gray-400);
   }

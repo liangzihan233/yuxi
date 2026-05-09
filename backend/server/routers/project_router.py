@@ -1,8 +1,10 @@
 """项目管理路由 - 项目 CRUD、文档上传、访谈流程、访谈记录"""
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from typing import Any
+import json
 
 from server.utils.auth_middleware import get_required_user
 from yuxi.storage.postgres.models_business import User
@@ -70,6 +72,10 @@ class InterviewCreate(BaseModel):
     valid_until: str | None = None
     max_participants: int = 10
     linked_flows: list[int]
+
+
+class InterviewStatusUpdate(BaseModel):
+    status: str
 
 
 # --- 项目 CRUD ---
@@ -184,9 +190,28 @@ async def create_interview(project_id: int, data: InterviewCreate, current_user:
 
 
 @projects_router.get("/{project_id}/interviews")
-async def list_interviews(project_id: int, current_user: User = Depends(get_required_user)):
-    interviews = await interview_repo.list_by_project(project_id)
-    return [i.to_dict() for i in interviews]
+async def list_interviews(
+    project_id: int,
+    status: str | None = Query(None, description="筛选状态: pending/in_progress/completed/analyzing/archived"),
+    parent_interview_id: int | None = Query(None, description="主访谈ID，仅返回该访谈及其全部会话记录"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
+    current_user: User = Depends(get_required_user),
+):
+    """分页查询访谈记录列表，支持状态筛选"""
+    return await interview_service.list_interviews_paginated(
+        project_id,
+        status=status,
+        page=page,
+        page_size=page_size,
+        parent_interview_id=parent_interview_id,
+    )
+
+
+@projects_router.get("/{project_id}/interviews/stats")
+async def get_interview_stats(project_id: int, current_user: User = Depends(get_required_user)):
+    """获取项目访谈统计数据"""
+    return await interview_service.get_interview_stats(project_id)
 
 
 @projects_router.get("/{project_id}/interviews/{interview_id}")
@@ -197,7 +222,68 @@ async def get_interview(interview_id: int, current_user: User = Depends(get_requ
     return interview.to_dict()
 
 
+@projects_router.get("/{project_id}/interviews/{interview_id}/export")
+async def export_interview_transcript(
+    project_id: int,
+    interview_id: int,
+    current_user: User = Depends(get_required_user),
+):
+    interview = await interview_repo.get_by_id(interview_id)
+    if interview is None or interview.project_id != project_id:
+        raise HTTPException(status_code=404, detail="访谈记录不存在")
+
+    transcript_text = ""
+    if interview.transcript:
+        try:
+            transcript_items = json.loads(interview.transcript)
+            lines = []
+            for item in transcript_items:
+                role = item.get("role", "unknown")
+                content = item.get("content", "")
+                timestamp = item.get("time") or ""
+                prefix = f"[{timestamp}] " if timestamp else ""
+                lines.append(f"{prefix}{role}: {content}")
+            transcript_text = "\n".join(lines)
+        except Exception:
+            transcript_text = interview.transcript
+
+    if not transcript_text:
+        transcript_text = "暂无访谈记录"
+
+    filename = f"interview-{interview_id}-transcript.txt"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return PlainTextResponse(transcript_text, headers=headers)
+
+
 @projects_router.delete("/{project_id}/interviews/{interview_id}")
 async def delete_interview(project_id: int, interview_id: int, current_user: User = Depends(get_required_user)):
     await interview_service.delete_interview(interview_id)
     return {"message": "删除成功"}
+
+
+@projects_router.put("/{project_id}/interviews/{interview_id}/status")
+async def update_interview_status(
+    project_id: int, interview_id: int, data: InterviewStatusUpdate, current_user: User = Depends(get_required_user)
+):
+    """更新访谈状态"""
+    return await interview_service.update_interview_status(interview_id, data.status)
+
+
+@projects_router.post("/{project_id}/interviews/{interview_id}/analyze")
+async def analyze_interview(
+    project_id: int,
+    interview_id: int,
+    current_user: User = Depends(get_required_user),
+):
+    """使用系统默认对话模型分析访谈记录"""
+    return await interview_service.analyze_interview(project_id, interview_id)
+
+
+@projects_router.post("/{project_id}/interviews/{interview_id}/archive")
+async def archive_interview(
+    project_id: int,
+    interview_id: int,
+    current_user: User = Depends(get_required_user),
+):
+    """将已完成访谈记录入库到项目对应知识库"""
+    return await interview_service.archive_interview_to_knowledge_base(project_id, interview_id)

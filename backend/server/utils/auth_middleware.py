@@ -23,6 +23,9 @@ PUBLIC_PATHS = [
     r"^/api$",  # Health Check
     r"^/api/system/health$",  # Health Check
     r"^/api/system/info$",  # 获取系统信息配置
+    r"^/api/interviews/by-token/.*$",  # 访谈 token 查询（受访者入口）
+    r"^/api/interviews/\d+/rtc-config$",  # 访谈 RTC 配置（受访者）
+    r"^/api/interviews/\d+/stop$",  # 访谈结束（受访者）
 ]
 
 

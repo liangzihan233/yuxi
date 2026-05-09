@@ -80,6 +80,12 @@ const router = createRouter({
           name: 'ProjectDetail',
           component: () => import('../views/ProjectDetailView.vue'),
           meta: { keepAlive: false, requiresAuth: true, requiresAdmin: true }
+        },
+        {
+          path: ':project_id/interviews',
+          name: 'InterviewList',
+          component: () => import('../views/InterviewListView.vue'),
+          meta: { keepAlive: false, requiresAuth: true, requiresAdmin: true }
         }
       ]
     },
@@ -137,6 +143,12 @@ const router = createRouter({
       path: '/skills',
       name: 'skills',
       redirect: '/extensions'
+    },
+    {
+      path: '/interview/:token',
+      name: 'InterviewRoom',
+      component: () => import('../interview/views/InterviewRoomView.vue'),
+      meta: { requiresAuth: false }
     },
     {
       path: '/:pathMatch(.*)*',

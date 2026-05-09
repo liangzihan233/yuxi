@@ -76,6 +76,7 @@ dependencies = [
     "tqdm>=4.66.4",
     "typer>=0.16.0",
     "unstructured>=0.17.2",
+    "volcengine>=1.0.0",
     "wcmatch>=8.0.0",
 ]
 

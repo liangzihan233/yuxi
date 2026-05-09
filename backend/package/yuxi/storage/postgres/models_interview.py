@@ -119,6 +119,7 @@ class Interview(Base):
 
     # 访谈链接生成相关
     name = Column(String(200), nullable=True, comment="访谈名称")
+    interview_token = Column(String(64), nullable=True, unique=True, index=True, comment="访谈访问令牌（UUID）")
     valid_from = Column(DateTime, nullable=True, comment="访谈有效开始时间")
     valid_until = Column(DateTime, nullable=True, comment="访谈有效结束时间")
     max_participants = Column(Integer, nullable=False, default=10, comment="最大参与人数")
@@ -126,16 +127,20 @@ class Interview(Base):
 
     # 关联现有对话体系
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True, index=True, comment="关联对话")
+    parent_interview_id = Column(Integer, ForeignKey("interviews.id"), nullable=True, index=True, comment="所属主访谈")
 
     # 访谈内容
     transcript = Column(Text, nullable=True, comment="文字转录内容")
+    session_uuid = Column(String(64), nullable=True, index=True, comment="单次受访会话幂等ID")
+    archived_db_id = Column(String(128), nullable=True, comment="已入库知识库ID")
+    archived_file_id = Column(String(128), nullable=True, comment="已入库文件ID")
     video_url = Column(String(500), nullable=True, comment="回放视频 MinIO URL")
     audio_url = Column(String(500), nullable=True, comment="音频 MinIO URL")
     summary = Column(Text, nullable=True, comment="AI 生成的访谈摘要")
 
     # 状态
     status = Column(
-        String(20), nullable=False, default="pending", comment="状态: pending/in_progress/completed/analyzing"
+        String(20), nullable=False, default="pending", comment="状态: pending/in_progress/completed/analyzing/archived"
     )
 
     # 参与者信息
@@ -157,12 +162,17 @@ class Interview(Base):
             "project_id": self.project_id,
             "flow_id": self.flow_id,
             "name": self.name,
+            "interview_token": self.interview_token,
             "valid_from": format_utc_datetime(self.valid_from),
             "valid_until": format_utc_datetime(self.valid_until),
             "max_participants": self.max_participants,
             "linked_flows": self.linked_flows or [],
             "conversation_id": self.conversation_id,
+            "parent_interview_id": self.parent_interview_id,
             "transcript": self.transcript,
+            "session_uuid": self.session_uuid,
+            "archived_db_id": self.archived_db_id,
+            "archived_file_id": self.archived_file_id,
             "video_url": self.video_url,
             "audio_url": self.audio_url,
             "summary": self.summary,

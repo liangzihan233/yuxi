@@ -185,6 +185,25 @@ class PostgresManager(metaclass=SingletonMeta):
         """确保业务 schema 包含后续新增字段（兼容已存在表）。"""
         self._check_initialized()
         stmts = [
+            "ALTER TABLE IF EXISTS interviews ADD COLUMN IF NOT EXISTS parent_interview_id INTEGER",
+            "ALTER TABLE IF EXISTS interviews ADD COLUMN IF NOT EXISTS session_uuid VARCHAR(64)",
+            "ALTER TABLE IF EXISTS interviews ADD COLUMN IF NOT EXISTS archived_db_id VARCHAR(128)",
+            "ALTER TABLE IF EXISTS interviews ADD COLUMN IF NOT EXISTS archived_file_id VARCHAR(128)",
+            "CREATE INDEX IF NOT EXISTS idx_interviews_session_uuid ON interviews(session_uuid)",
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'fk_interviews_parent_interview_id'
+                ) THEN
+                    ALTER TABLE interviews
+                    ADD CONSTRAINT fk_interviews_parent_interview_id
+                    FOREIGN KEY (parent_interview_id) REFERENCES interviews(id);
+                END IF;
+            END
+            $$;
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_interviews_parent_interview_id ON interviews(parent_interview_id)",
             "ALTER TABLE IF EXISTS skills ADD COLUMN IF NOT EXISTS tool_dependencies JSONB DEFAULT '[]'::jsonb",
             "ALTER TABLE IF EXISTS skills ADD COLUMN IF NOT EXISTS mcp_dependencies JSONB DEFAULT '[]'::jsonb",
             "ALTER TABLE IF EXISTS skills ADD COLUMN IF NOT EXISTS skill_dependencies JSONB DEFAULT '[]'::jsonb",
