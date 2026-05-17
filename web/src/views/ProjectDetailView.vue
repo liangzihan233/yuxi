@@ -226,10 +226,12 @@
         <!-- 访谈记录卡片 -->
         <div class="section-card">
           <div class="section-header">
-            <h3><MessageSquare :size="16" /> 访谈记录</h3>
-            <a-button type="primary" ghost size="small" @click="handleGenerateInterviewLink">
-              <LinkOutlined /> 生成访谈链接
-            </a-button>
+            <h3><MessageSquare :size="16" /> 访谈列表</h3>
+            <div class="section-actions">
+              <a-button type="primary" ghost size="small" @click="handleGenerateInterviewLink">
+                <LinkOutlined /> 生成访谈链接
+              </a-button>
+            </div>
           </div>
           <div class="section-body">
             <div v-if="interviews.length === 0" class="empty-section">
@@ -237,7 +239,7 @@
             </div>
             <div v-else class="interview-list">
               <div v-for="interview in displayedInterviews" :key="interview.id" class="interview-item">
-                <div class="interview-info">
+                <div class="interview-info" @click="goToInterviewList(interview)">
                   <div class="interview-name-row">
                     <span class="interview-name">{{ interview.name || '访谈 #' + interview.id }}</span>
                     <a-tag :color="interviewStatusColor[interview.status] || 'default'" :bordered="false" size="small">
@@ -262,22 +264,14 @@
                   </div>
                 </div>
                 <div class="interview-actions">
-                  <a-tooltip title="查看访谈列表">
-                    <a-button type="text" size="small" @click.stop="goToInterviewList(interview)">
-                      <EyeOutlined />
-                    </a-button>
-                  </a-tooltip>
-                  <a-tooltip :title="interview.status === 'archived' ? '该访谈已入库' : interview.status === 'completed' ? '入库' : '仅已完成访谈可入库'">
-                    <a-button
-                      type="text"
-                      size="small"
-                      :disabled="interview.status !== 'completed'"
-                      :loading="archivingInterviewId === interview.id"
-                      @click.stop="handleArchiveInterview(interview)"
-                    >
-                      入库
-                    </a-button>
-                  </a-tooltip>
+                  <a-button
+                    type="text"
+                    size="small"
+                    :loading="archivingInterviewId === interview.id"
+                    @click.stop="handleArchiveInterview(interview)"
+                  >
+                    入库
+                  </a-button>
                   <a-tooltip title="复制链接">
                     <a-button type="text" size="small" @click="handleCopyLink(interview)">
                       <CopyOutlined />
@@ -481,26 +475,47 @@
           />
           <div class="form-hint">最大跨度一个月，结束时间不可选当前时间之前</div>
         </a-form-item>
-        <a-form-item label="关联访谈流程" required>
-          <a-checkbox-group v-model:value="interviewForm.linked_flows" style="width: 100%">
-            <div class="flow-checkbox-list">
-              <a-checkbox
-                v-for="flow in confirmedFlows"
-                :key="flow.id"
-                :value="flow.id"
-                class="flow-checkbox-item"
-              >
-                <div class="flow-checkbox-content">
-                  <span class="flow-checkbox-name">{{ flow.name }}</span>
-                  <span class="flow-checkbox-meta">
-                    {{ flowTypeLabel[flow.flow_type] || '杂谈' }}
-                    <template v-if="flow.estimated_duration"> · {{ flow.estimated_duration }}分钟</template>
-                  </span>
-                </div>
-              </a-checkbox>
-            </div>
-          </a-checkbox-group>
-        </a-form-item>
+        <div class="interview-selection-row">
+          <a-form-item label="关联访谈流程" required class="interview-selection-item">
+            <a-checkbox-group v-model:value="interviewForm.linked_flows" style="width: 100%">
+              <div class="flow-checkbox-list">
+                <a-checkbox
+                  v-for="flow in confirmedFlows"
+                  :key="flow.id"
+                  :value="flow.id"
+                  class="flow-checkbox-item"
+                >
+                  <div class="flow-checkbox-content">
+                    <span class="flow-checkbox-name">{{ flow.name }}</span>
+                    <span class="flow-checkbox-meta">
+                      {{ flowTypeLabel[flow.flow_type] || '杂谈' }}
+                      <template v-if="flow.estimated_duration"> · {{ flow.estimated_duration }}分钟</template>
+                    </span>
+                  </div>
+                </a-checkbox>
+              </div>
+            </a-checkbox-group>
+          </a-form-item>
+          <a-form-item label="选择主持人" required class="interview-selection-item">
+            <a-checkbox-group v-model:value="interviewForm.moderator_ids" style="width: 100%">
+              <div class="flow-checkbox-list">
+                <a-checkbox
+                  v-for="moderator in moderatorOptions"
+                  :key="moderator.id"
+                  :value="moderator.id"
+                  class="flow-checkbox-item"
+                >
+                  <div class="flow-checkbox-content">
+                    <span class="flow-checkbox-name">{{ moderator.name }}</span>
+                    <span class="flow-checkbox-meta">
+                      {{ moderator.meta || '角色卡主持人' }}
+                    </span>
+                  </div>
+                </a-checkbox>
+              </div>
+            </a-checkbox-group>
+          </a-form-item>
+        </div>
         <a-form-item label="最高参与人数">
           <a-input-number v-model:value="interviewForm.max_participants" :min="1" :max="100" style="width: 200px" />
         </a-form-item>
@@ -556,6 +571,7 @@ import {
   EyeOutlined
 } from '@ant-design/icons-vue'
 import { projectApi, flowApi, interviewApi } from '@/apis/project_api'
+import { roleCardApi } from '@/apis/rolecard_api'
 import HeaderComponent from '@/components/HeaderComponent.vue'
 import InterviewFlowEditor from '@/components/InterviewFlowEditor.vue'
 import dayjs, { parseToShanghai } from '@/utils/time'
@@ -569,6 +585,7 @@ const project = ref(null)
 const flows = ref([])
 const interviews = ref([])
 const archivingInterviewId = ref(null)
+const archivingAll = ref(false)
 
 // 上传相关
 const uploading = ref(false)
@@ -621,9 +638,11 @@ const interviewForm = reactive({
   name: '',
   dateRange: null,
   linked_flows: [],
+  moderator_ids: [],
   max_participants: 10
 })
 const confirmedFlows = ref([])
+const moderatorOptions = ref([])
 
 // 二维码弹窗
 const qrCodeVisible = ref(false)
@@ -683,6 +702,26 @@ const getDocumentName = (url) => {
   if (!url) return ''
   const parts = url.split('/')
   return decodeURIComponent(parts[parts.length - 1])
+}
+
+const normalizeModeratorOption = (card) => ({
+  id: card.name,
+  name: card.name,
+  meta: card.description || '角色卡主持人'
+})
+
+const loadModeratorOptions = async () => {
+  const result = await roleCardApi.getRoleCards()
+  const cards = result?.data || []
+  moderatorOptions.value = cards
+    .filter(card => card.enabled !== false)
+    .map(normalizeModeratorOption)
+}
+
+const ensureDefaultModerator = () => {
+  if (!interviewForm.moderator_ids.length && moderatorOptions.value.length > 0) {
+    interviewForm.moderator_ids = [moderatorOptions.value[0].id]
+  }
 }
 
 const goBack = () => {
@@ -983,13 +1022,16 @@ const handleGenerateInterviewLink = async () => {
       })
       return
     }
+    await loadModeratorOptions()
     // 保存已确认的流程列表供弹窗选择
     confirmedFlows.value = result.confirmed_flows.map(f => f.to_dict ? f.to_dict() : f)
     // 重置表单
     interviewForm.name = ''
     interviewForm.dateRange = null
     interviewForm.linked_flows = []
+    interviewForm.moderator_ids = []
     interviewForm.max_participants = 10
+    ensureDefaultModerator()
     createInterviewVisible.value = true
   } catch (error) {
     message.error('校验失败: ' + (error.message || '未知错误'))
@@ -1010,6 +1052,10 @@ const handleCreateInterview = async () => {
     message.error('请至少关联一个访谈流程')
     return
   }
+  if (interviewForm.moderator_ids.length === 0) {
+    message.error('请至少选择一位主持人')
+    return
+  }
 
   // 校验跨度不超过一个月
   const start = interviewForm.dateRange[0]
@@ -1026,7 +1072,8 @@ const handleCreateInterview = async () => {
       valid_from: start.format('YYYY-MM-DD HH:mm:ss'),
       valid_until: end.format('YYYY-MM-DD HH:mm:ss'),
       max_participants: interviewForm.max_participants,
-      linked_flows: interviewForm.linked_flows
+      linked_flows: interviewForm.linked_flows,
+      moderator_ids: interviewForm.moderator_ids
     })
     message.success('访谈链接创建成功')
     createInterviewVisible.value = false
@@ -1084,16 +1131,36 @@ const handleDeleteInterview = async (interview) => {
 }
 
 const handleArchiveInterview = async (interview) => {
-  if (!interview?.id || interview.status !== 'completed') return
+  if (!interview?.id) return
+
   archivingInterviewId.value = interview.id
   try {
     await interviewApi.archiveInterview(projectId.value, interview.id)
     message.success('访谈记录已入库')
     await loadProject()
   } catch (error) {
-    message.error('入库失败: ' + (error.message || '未知错误'))
+    message.error(error.message || '入库失败')
   } finally {
     archivingInterviewId.value = null
+  }
+}
+
+const handleArchiveAvailableInterviews = async () => {
+  const firstInterview = displayedInterviews.value[0]
+  if (!firstInterview?.id) {
+    message.info('没有访谈可入库')
+    return
+  }
+
+  archivingAll.value = true
+  try {
+    await interviewApi.archiveInterview(projectId.value, firstInterview.id)
+    message.success('访谈记录已入库')
+    await loadProject()
+  } catch (error) {
+    message.error(error.message || '入库失败')
+  } finally {
+    archivingAll.value = false
   }
 }
 
@@ -1399,6 +1466,16 @@ onMounted(() => {
 }
 
 // 流程复选框列表
+.interview-selection-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+
+  .interview-selection-item {
+    margin-bottom: 0;
+  }
+}
+
 .flow-checkbox-list {
   max-height: 200px;
   overflow-y: auto;
@@ -1449,15 +1526,18 @@ onMounted(() => {
   border: 1px solid var(--gray-150);
   border-radius: 8px;
   transition: all 0.2s;
-
-  &:hover {
-    border-color: var(--main-30);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  }
+ &:hover {
+      border-color: var(--main-color);
+    }
 
   .interview-info {
     flex: 1;
     min-width: 0;
+    padding: 8px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
 
     .interview-name-row {
       display: flex;

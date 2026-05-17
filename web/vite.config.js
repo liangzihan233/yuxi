@@ -1,6 +1,9 @@
 import { fileURLToPath, URL } from 'node:url'
+import path from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+
+const workspaceRoot = fileURLToPath(new URL('..', import.meta.url))
 
 export default defineConfig(({ mode }) => {
   // eslint-disable-next-line no-undef
@@ -13,6 +16,9 @@ export default defineConfig(({ mode }) => {
       }
     },
     server: {
+      fs: {
+        allow: [workspaceRoot, path.resolve(workspaceRoot, 'web')]
+      },
       proxy: {
         '^/api': {
           target: env.VITE_API_URL || 'http://api:5050',

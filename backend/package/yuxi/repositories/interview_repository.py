@@ -113,6 +113,20 @@ class InterviewRepository:
             )
             return list(result.scalars().all())
 
+    async def has_analyzing_interview_available_for_archive(self, project_id: int, interview_id: int) -> bool:
+        interview = await self.get_by_id(interview_id)
+        if interview is None or interview.project_id != project_id:
+            return False
+
+        if interview.parent_interview_id is not None:
+            return interview.status == "analyzing"
+
+        children = await self.list_children_by_parent_interview(interview.id)
+        if any(child.status == "analyzing" for child in children):
+            return True
+
+        return interview.status == "analyzing"
+
     async def list_by_project_paginated(
         self,
         project_id: int,

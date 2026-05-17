@@ -186,7 +186,7 @@ const extraText = computed(() =>
     h(
       'a',
       {
-        href: 'https://xerrors.github.io/Yuxi/intro/evaluation.html',
+        href: 'https://liqun.wv1344.top//intro/evaluation.html',
         target: '_blank',
         rel: 'noopener noreferrer'
       },

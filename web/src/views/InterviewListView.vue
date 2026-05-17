@@ -1,6 +1,6 @@
 <template>
   <div class="interview-list-container layout-container">
-    <HeaderComponent :title="projectName || '访谈列表'">
+    <HeaderComponent :title="projectName || '访谈记录'">
       <template #left>
         <a-button type="text" @click="goBack" class="back-btn">
           <template #icon><ArrowLeft :size="18" /></template>
@@ -23,7 +23,7 @@
               <CheckCircle :size="20" />
             </div>
             <div class="stat-body">
-              <span class="stat-value">{{ stats.completed }}</span>
+              <span class="stat-value">{{ scopedStats.completed }}</span>
               <span class="stat-label">已完成</span>
             </div>
           </div>
@@ -33,7 +33,7 @@
               <Clock :size="20" />
             </div>
             <div class="stat-body">
-              <span class="stat-value">{{ stats.in_progress }}</span>
+              <span class="stat-value">{{ scopedStats.in_progress }}</span>
               <span class="stat-label">进行中</span>
             </div>
           </div>
@@ -53,7 +53,7 @@
               <Database :size="20" />
             </div>
             <div class="stat-body">
-              <span class="stat-value">{{ stats.analyzing + stats.archived }}</span>
+              <span class="stat-value">{{ scopedStats.analyzing + scopedStats.archived }}</span>
               <span class="stat-label">分析入库</span>
             </div>
           </div>
@@ -128,7 +128,13 @@
                     <a-button type="link" size="small" @click="handleView(record)">
                       <EyeOutlined /> 查看
                     </a-button>
-                    <a-button type="link" size="small" :loading="analyzingId === record.id" @click="handleAnalyze(record)">
+                    <a-button
+                      v-if="!['analyzing', 'archived'].includes(resolveInterviewStatus(record))"
+                      type="link"
+                      size="small"
+                      :loading="analyzingId === record.id"
+                      @click="handleAnalyze(record)"
+                    >
                       分析
                     </a-button>
                     <a-button type="link" size="small" @click="handleExport(record)">
@@ -154,12 +160,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { ArrowLeft, FileText, CheckCircle, Clock, Timer, Database } from 'lucide-vue-next'
 import { EyeOutlined, DownloadOutlined } from '@ant-design/icons-vue'
-import { interviewApi, projectApi } from '@/apis/project_api'
+import { interviewApi } from '@/apis/project_api'
 import HeaderComponent from '@/components/HeaderComponent.vue'
 import dayjs, { parseToShanghai } from '@/utils/time'
 
@@ -170,6 +176,29 @@ const projectId = ref(null)
 const projectName = ref('')
 const loading = ref(false)
 const tableLoading = ref(false)
+
+function resolveInterviewStatus(interview) {
+  void nowTick.value
+  if (!interview) return 'pending'
+
+  const isParentInterview = !interview.parent_interview_id
+  if (isParentInterview) {
+    if ((interview.session_count || 0) >= Math.max(interview.max_participants || 1, 1)) return 'completed'
+    if (interview.status === 'archived') return 'archived'
+    if (interview.status === 'analyzing') return 'analyzing'
+  } else if (interview.status === 'analyzing' || interview.status === 'archived') {
+    return interview.status
+  }
+
+  const now = dayjs()
+  const validFrom = interview.valid_from ? parseToShanghai(interview.valid_from) : null
+  const validUntil = interview.valid_until ? parseToShanghai(interview.valid_until) : null
+
+  if (validFrom && validFrom.isAfter(now)) return 'pending'
+  if ((interview.session_count || 0) >= Math.max(interview.max_participants || 1, 1)) return 'completed'
+  if (validUntil && !validUntil.isAfter(now)) return 'completed'
+  return 'in_progress'
+}
 
 // 统计数据
 const stats = reactive({
@@ -183,17 +212,68 @@ const stats = reactive({
 })
 
 // 表格数据
-const tableData = ref([])
-const total = ref(0)
+const allInterviews = ref([])
+const tableData = computed(() => {
+  const filtered = allInterviews.value.filter((interview) => {
+    if (!currentFilter.value) return true
+    return resolveInterviewStatus(interview) === currentFilter.value
+  })
+
+  const start = (currentPage.value - 1) * pageSize.value
+  return filtered.slice(start, start + pageSize.value)
+})
+const total = computed(() => {
+  return allInterviews.value.filter((interview) => {
+    if (!currentFilter.value) return true
+    return resolveInterviewStatus(interview) === currentFilter.value
+  }).length
+})
 const currentPage = ref(1)
 const pageSize = ref(10)
 const currentFilter = ref('')
 const analyzingId = ref(null)
+const nowTick = ref(Date.now())
 const parentInterviewId = computed(() => {
   const raw = route.query.interview_id
   if (!raw) return null
   const parsed = Number(Array.isArray(raw) ? raw[0] : raw)
-  return Number.isFinite(parsed) ? parsed : null
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+})
+
+const scopedInterviews = computed(() => {
+  const source = allInterviews.value
+  if (!parentInterviewId.value) return source
+  return source.filter((it) => it.id === parentInterviewId.value || it.parent_interview_id === parentInterviewId.value)
+})
+
+const scopedStats = computed(() => {
+  const result = {
+    completed: 0,
+    in_progress: 0,
+    remaining_seconds: 0,
+    analyzing: 0,
+    archived: 0,
+  }
+
+  for (const interview of scopedInterviews.value) {
+    const status = resolveInterviewStatus(interview)
+    if (status === 'completed') result.completed += 1
+    if (status === 'in_progress') result.in_progress += 1
+    if (status === 'analyzing') result.analyzing += 1
+    if (status === 'archived') result.archived += 1
+  }
+
+  if (parentInterviewId.value) {
+    const parent = allInterviews.value.find((it) => it.id === parentInterviewId.value)
+    if (parent?.valid_until) {
+      const until = parseToShanghai(parent.valid_until)
+      if (until) {
+        result.remaining_seconds = Math.max(0, until.diff(dayjs(), 'second'))
+      }
+    }
+  }
+
+  return result
 })
 
 // 状态映射
@@ -215,7 +295,7 @@ const statusColorMap = {
 
 // 剩余时长格式化
 const remainingDuration = computed(() => {
-  const seconds = stats.remaining_seconds
+  const seconds = scopedStats.value.remaining_seconds
   if (seconds <= 0) return '0h'
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
@@ -266,30 +346,19 @@ const goBack = () => {
   router.push({ path: `/project/${projectId.value}` })
 }
 
-// 加载统计数据
-const loadStats = async () => {
-  try {
-    const data = await interviewApi.getInterviewStats(projectId.value)
-    Object.assign(stats, data)
-  } catch (error) {
-    console.error('加载统计失败:', error)
-  }
-}
-
-// 加载表格数据
+// 加载表格数据：必须基于当前 interview_id 查询对应主访谈及其会话记录。
 const loadTableData = async () => {
   tableLoading.value = true
   try {
     const result = await interviewApi.listInterviewsPaginated(projectId.value, {
-      status: currentFilter.value || undefined,
-      page: currentPage.value,
-      pageSize: pageSize.value,
-      interviewId: parentInterviewId.value || undefined
+      page: 1,
+      pageSize: 1000,
+      interviewId: parentInterviewId.value
     })
-    tableData.value = result.items || []
-    total.value = result.total || 0
+    allInterviews.value = result?.items || []
+    currentPage.value = 1
   } catch (error) {
-    message.error('加载访谈列表失败')
+    message.error('加载访谈记录失败')
     console.error(error)
   } finally {
     tableLoading.value = false
@@ -340,7 +409,6 @@ const handleAnalyze = async (record) => {
   try {
     await interviewApi.analyzeInterview(projectId.value, record.id)
     message.success('分析完成')
-    await loadStats()
     await loadTableData()
   } catch (error) {
     console.error(error)
@@ -355,25 +423,22 @@ const handleDelete = async (record) => {
   try {
     await interviewApi.deleteInterview(projectId.value, record.id)
     message.success('删除成功')
-    await loadStats()
     await loadTableData()
   } catch (error) {
     message.error('删除失败: ' + (error.message || '未知错误'))
   }
 }
 
-// 初始化
 const init = async () => {
+  if (!projectId.value || !parentInterviewId.value) {
+    message.error('缺少访谈 id，无法加载访谈记录')
+    router.push(`/project/${projectId.value}`)
+    return
+  }
+
   loading.value = true
   try {
-    if (parentInterviewId.value) {
-      currentFilter.value = 'completed'
-    }
-    const [projectData] = await Promise.all([
-      projectApi.getProject(projectId.value),
-      loadStats()
-    ])
-    projectName.value = projectData.name || '访谈列表'
+    projectName.value = '访谈记录'
     await loadTableData()
   } catch (error) {
     message.error('加载数据失败')
@@ -384,10 +449,10 @@ const init = async () => {
 }
 
 watch(
-  () => route.params.project_id,
-  (newId) => {
-    if (newId) {
-      projectId.value = parseInt(newId)
+  [() => route.params.project_id, () => parentInterviewId.value],
+  ([newProjectId, newInterviewId]) => {
+    if (newProjectId && newInterviewId) {
+      projectId.value = parseInt(newProjectId)
       init()
     }
   },

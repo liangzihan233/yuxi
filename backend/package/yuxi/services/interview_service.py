@@ -6,6 +6,7 @@ from datetime import datetime
 import traceback
 import os
 import tempfile
+import asyncio
 
 from fastapi import HTTPException
 
@@ -15,6 +16,7 @@ from yuxi.repositories.project_repository import ProjectRepository
 from yuxi.models.chat import select_model
 from yuxi import config, knowledge_base
 from yuxi.utils.logging_config import logger
+from yuxi.services import rolecard_service
 
 
 def _parse_datetime_str(val: str | None) -> datetime | None:
@@ -96,6 +98,24 @@ class InterviewService:
                 status_code=400, detail=f"关联流程 {invalid_ids} 不存在或未确认"
             )
 
+        moderator_ids = [str(item).strip() for item in (data.get("moderator_ids") or []) if str(item).strip()]
+        if not moderator_ids:
+            raise HTTPException(status_code=400, detail="请至少选择一位主持人")
+
+        selected_moderator_name = moderator_ids[0]
+        selected_rolecard = await rolecard_service.get_rolecard(selected_moderator_name)
+        if not selected_rolecard:
+            raise HTTPException(status_code=400, detail=f"主持人角色「{selected_moderator_name}」不存在")
+
+        participant_info = {
+            "moderator": {
+                "name": selected_rolecard.get("name") or selected_moderator_name,
+                "description": selected_rolecard.get("description") or "",
+                "system_prompt": selected_rolecard.get("system_prompt") or "",
+            },
+            "moderator_ids": moderator_ids,
+        }
+
         interview = await self.interview_repo.create(
             {
                 "project_id": project_id,
@@ -106,6 +126,7 @@ class InterviewService:
                 "valid_until": _parse_datetime_str(data.get("valid_until")),
                 "max_participants": data.get("max_participants", 10),
                 "linked_flows": data.get("linked_flows", []),
+                "participant_info": participant_info,
             }
         )
         return interview.to_dict()
@@ -318,6 +339,7 @@ class InterviewService:
         return interview.status or "completed"
 
     async def archive_interview_to_knowledge_base(self, project_id: int, interview_id: int) -> dict:
+        """将包含已分析记录的访谈入库到项目知识库。"""
         project = await self.project_repo.get_by_id(project_id)
         if project is None:
             raise HTTPException(status_code=404, detail="项目不存在")
@@ -326,23 +348,17 @@ class InterviewService:
         if interview is None or interview.project_id != project_id:
             raise HTTPException(status_code=404, detail="访谈记录不存在")
 
-        if interview.archived_db_id and interview.archived_file_id:
-            raise HTTPException(status_code=400, detail="该访谈记录已入库，请勿重复操作")
-
-        display_status = self._resolve_interview_display_status(interview)
-        if display_status != "completed":
-            raise HTTPException(status_code=400, detail="仅已完成的访谈记录可入库")
+        if not await self.interview_repo.has_analyzing_interview_available_for_archive(project_id, interview_id):
+            raise HTTPException(status_code=400, detail="没有访谈可入库")
 
         archive_documents = await self._build_archive_documents(project.name, interview)
         if not archive_documents:
-            if interview.archived_db_id and interview.archived_file_id:
-                raise HTTPException(status_code=400, detail="该访谈记录已入库，请勿重复操作")
-            raise HTTPException(status_code=400, detail="当前访谈记录暂无可入库内容")
+            raise HTTPException(status_code=400, detail="没有访谈可入库")
 
         database_name = project.name
         databases = await knowledge_base.get_databases()
-        writable_kb_types = {"milvus", "lightrag"}
-        preferred_kb_type = "milvus" if "milvus" in writable_kb_types else "lightrag"
+        writable_kb_types = {"lightrag", "milvus"}
+        preferred_kb_type = "lightrag"
         target_db = None
 
         if getattr(project, "knowledge_base_id", None):
@@ -350,14 +366,14 @@ class InterviewService:
                 (db for db in databases.get("databases", []) if db.get("db_id") == project.knowledge_base_id),
                 None,
             )
-            if bound_db and (bound_db.get("kb_type") or "").lower() in writable_kb_types:
+            if bound_db and (bound_db.get("kb_type") or "").lower() == preferred_kb_type:
                 target_db = bound_db
 
         if target_db is None:
             target_db = next(
                 (
                     db for db in databases.get("databases", [])
-                    if db.get("name") == database_name and (db.get("kb_type") or "").lower() in writable_kb_types
+                    if db.get("name") == database_name and (db.get("kb_type") or "").lower() == preferred_kb_type
                 ),
                 None,
             )
@@ -370,15 +386,17 @@ class InterviewService:
                 (db for db in databases.get("databases", []) if db.get("name") == database_name),
                 None,
             )
-            if name_conflict_db is not None and (name_conflict_db.get("kb_type") or "").lower() not in writable_kb_types:
+            if name_conflict_db is not None and (name_conflict_db.get("kb_type") or "").lower() != preferred_kb_type:
                 archive_database_name = f"{database_name}-访谈知识库"
 
             try:
+                embed_info = config.embed_model_names[config.embed_model].model_dump()
+
                 created = await knowledge_base.create_database(
                     archive_database_name,
                     f"项目 {project.name} 的访谈知识库",
                     kb_type=preferred_kb_type,
-                    embed_info=None,
+                    embed_info=embed_info,
                     llm_info=None,
                     auto_generate_questions=False,
                 )
@@ -393,7 +411,7 @@ class InterviewService:
                 (
                     db for db in databases.get("databases", [])
                     if ((db_id and db.get("db_id") == db_id) or db.get("name") == archive_database_name)
-                    and (db.get("kb_type") or "").lower() in writable_kb_types
+                    and (db.get("kb_type") or "").lower() == preferred_kb_type
                 ),
                 None,
             )
@@ -420,22 +438,36 @@ class InterviewService:
                 with open(tmp_path, "w", encoding="utf-8") as tmp:
                     tmp.write(document["content"])
                 try:
-                    file_meta = await knowledge_base.add_file_record(
-                        db_id,
-                        tmp_path,
-                        params={"content_type": "file"},
-                        operator_id="system",
+                    file_meta = await asyncio.wait_for(
+                        knowledge_base.add_file_record(
+                            db_id,
+                            tmp_path,
+                            params={"content_type": "file"},
+                            operator_id="system",
+                        ),
+                        timeout=30,
                     )
                     file_id = file_meta["file_id"]
-                    await knowledge_base.parse_file(db_id, file_id, operator_id="system")
-                    await knowledge_base.update_file_params(
-                        db_id,
-                        file_id,
-                        {"chunk_size": 1000, "chunk_overlap": 200},
-                        operator_id="system",
+                    await asyncio.wait_for(
+                        knowledge_base.parse_file(db_id, file_id, operator_id="system"),
+                        timeout=60,
+                    )
+                    await asyncio.wait_for(
+                        knowledge_base.update_file_params(
+                            db_id,
+                            file_id,
+                            {"chunk_size": 1000, "chunk_overlap": 200},
+                            operator_id="system",
+                        ),
+                        timeout=30,
                     )
                     try:
-                        await knowledge_base.index_file(db_id, file_id, operator_id="system")
+                        await asyncio.wait_for(
+                            knowledge_base.index_file(db_id, file_id, operator_id="system"),
+                            timeout=180,
+                        )
+                    except asyncio.TimeoutError:
+                        raise HTTPException(status_code=400, detail="访谈入库失败: 知识库索引超时，请稍后重试")
                     except Exception as index_exc:
                         error_message = str(index_exc)
                         if "LightRAG" not in error_message and "Invalid token" not in error_message:
@@ -471,6 +503,7 @@ class InterviewService:
                 await self.interview_repo.update(
                     child_interview_id,
                     {
+                        "status": "archived",
                         "archived_db_id": db_id,
                         "archived_file_id": child_file_id,
                     },
@@ -483,8 +516,9 @@ class InterviewService:
         }
 
     async def _build_archive_documents(self, project_name: str, interview) -> list[dict[str, str]]:
+        """构建需要入库的已分析访谈文档。"""
         if interview.parent_interview_id is not None:
-            if interview.archived_db_id and interview.archived_file_id:
+            if interview.status != "analyzing" or interview.archived_db_id and interview.archived_file_id:
                 return []
             transcript_text = self._normalize_transcript_for_analysis(interview.transcript or "").strip()
             if not transcript_text:
@@ -499,7 +533,7 @@ class InterviewService:
         child_interviews = await self.interview_repo.list_children_by_parent_interview(interview.id)
         documents = []
         for child in child_interviews:
-            if child.archived_db_id and child.archived_file_id:
+            if child.status != "analyzing" or child.archived_db_id and child.archived_file_id:
                 continue
             transcript_text = self._normalize_transcript_for_analysis(child.transcript or "").strip()
             if not transcript_text:
@@ -514,8 +548,10 @@ class InterviewService:
         if documents:
             return documents
 
+        if interview.status != "analyzing" or interview.archived_db_id and interview.archived_file_id:
+            return []
         transcript_text = self._normalize_transcript_for_analysis(interview.transcript or "").strip()
-        if not transcript_text or (interview.archived_db_id and interview.archived_file_id):
+        if not transcript_text:
             return []
         summary = self._normalize_summary_text(interview.summary)
         return [{

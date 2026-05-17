@@ -45,6 +45,12 @@
               <span>添加</span>
             </a-button>
           </template>
+          <template v-else-if="activeTab === 'role-cards'">
+            <a-button type="primary" @click="handleRoleCardAdd" class="lucide-icon-btn">
+              <Plus :size="14" />
+              <span>添加</span>
+            </a-button>
+          </template>
         </div>
       </template>
     </ViewSwitchHeader>
@@ -62,6 +68,9 @@
       <div v-show="activeTab === 'subagents'" class="tab-panel">
         <SubAgentsComponent ref="subagentsRef" @add="handleSubagentAdd" />
       </div>
+      <div v-show="activeTab === 'role-cards'" class="tab-panel">
+        <RoleCardsComponent ref="roleCardsRef" />
+      </div>
     </div>
   </div>
 </template>
@@ -75,16 +84,19 @@ import SkillsManagerComponent from '@/components/SkillsManagerComponent.vue'
 import ToolsManagerComponent from '@/components/ToolsManagerComponent.vue'
 import McpServersComponent from '@/components/McpServersComponent.vue'
 import SubAgentsComponent from '@/components/SubAgentsComponent.vue'
+import RoleCardsComponent from '@/components/RoleCardsComponent.vue'
 import ViewSwitchHeader from '@/components/ViewSwitchHeader.vue'
 
 const route = useRoute()
 const activeTab = ref('tools')
 const skillsRef = ref(null)
+const roleCardsRef = ref(null)
 
 const extensionTabs = [
   { key: 'tools', label: '工具' },
   { key: 'mcp', label: 'MCP' },
   { key: 'subagents', label: 'Subagents' },
+  { key: 'role-cards', label: '角色卡' },
   { key: 'skills', label: 'Skills' }
 ]
 
@@ -92,7 +104,7 @@ const extensionTabs = [
 watch(
   () => route.query,
   (query) => {
-    if (query.tab && ['tools', 'skills', 'mcp', 'subagents'].includes(query.tab)) {
+    if (query.tab && ['tools', 'skills', 'mcp', 'subagents', 'role-cards'].includes(query.tab)) {
       activeTab.value = query.tab
     }
   },
@@ -143,6 +155,12 @@ const handleMcpAdd = () => {
 const handleSubagentAdd = () => {
   if (subagentsRef.value?.showAddModal) {
     subagentsRef.value.showAddModal()
+  }
+}
+
+const handleRoleCardAdd = () => {
+  if (roleCardsRef.value?.showAddModal) {
+    roleCardsRef.value.showAddModal()
   }
 }
 

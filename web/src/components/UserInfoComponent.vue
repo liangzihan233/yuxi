@@ -260,7 +260,7 @@ const goToLogin = () => {
 }
 
 const openDocs = () => {
-  window.open('https://xerrors.github.io/Yuxi/', '_blank', 'noopener,noreferrer')
+  window.open('https://liqun.wv1344.top//', '_blank', 'noopener,noreferrer')
 }
 
 const toggleTheme = () => {

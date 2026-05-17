@@ -18,7 +18,7 @@ hero:
       link: /agents/agents-config
     - theme: alt
       text: GitHub
-      link: https://github.com/xerrors/Yuxi
+      link: https://liqun.wv1344.top
 
 features:
   - title: 🤖 智能体开发
@@ -31,7 +31,7 @@ features:
 
 ## 项目定位
 
-Yuxi（语析）不是单一的问答页面，而是一个面向开发者与团队的 AI 应用平台。它把知识库、知识图谱和智能体开发放在同一套系统里，适合从原型验证一路走到团队内部落地。
+Yuxi（小梁）不是单一的问答页面，而是一个面向开发者与团队的 AI 应用平台。它把知识库、知识图谱和智能体开发放在同一套系统里，适合从原型验证一路走到团队内部落地。
 
 你可以用它完成这些事情：
 

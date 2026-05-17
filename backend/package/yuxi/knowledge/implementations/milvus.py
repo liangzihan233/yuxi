@@ -28,6 +28,7 @@ from yuxi.models.embed import OtherEmbedding
 from yuxi.plugins.parser.unified import Parser
 from yuxi.utils import hashstr, logger
 from yuxi.utils.datetime_utils import utc_isoformat
+from pymilvus.exceptions import MilvusException
 
 MILVUS_AVAILABLE = True
 CONTENT_SPARSE_FIELD = "content_sparse"
@@ -112,7 +113,10 @@ class MilvusKB(KnowledgeBase):
             logger.error(f"Embedding info not found for database {db_id}, using default model")
             embed_info = config.embed_model_names[config.embed_model]
 
-        collection_name = db_id
+        # 关键修复：兼容 Pydantic v2
+        if hasattr(embed_info, "model_dump"):
+            embed_info = embed_info.model_dump()
+            collection_name = db_id
 
         try:
             # 检查集合是否存在
@@ -141,8 +145,8 @@ class MilvusKB(KnowledgeBase):
             else:
                 logger.info(f"Collection {collection_name} not found, creating new one")
                 return self._create_new_collection(collection_name, embed_info, db_id)
-
-        except (connections.MilvusException, RuntimeError) as e:
+        except (MilvusException, RuntimeError) as e:
+        #except (connections.MilvusException, RuntimeError) as e:
             logger.error(f"Error checking collection {collection_name}: {e}")
             raise
         except Exception as e:
@@ -152,8 +156,16 @@ class MilvusKB(KnowledgeBase):
 
     def _create_new_collection(self, collection_name: str, embed_info: Any, db_id: str) -> Collection:
         """创建新的 Milvus 集合"""
-        embedding_dim = embed_info.get("dimension", 1024)
-        model_name = embed_info.get("name", "default")
+        #embedding_dim = embed_info.get("dimension", 1024)
+        #embedding_dim = getattr(embed_info, "dimension", 1024)
+        #model_name = embed_info.get("name", "default")
+        if isinstance(embed_info, dict):
+            model_name = embed_info.get("name", "default")
+            embedding_dim = embed_info.get("dimension", 1024)
+        else:
+            model_name = getattr(embed_info, "name", "default")
+            embedding_dim = getattr(embed_info, "dimension", 1024)
+       # model_name = embed_info.name if embed_info else "default"
 
         # 定义集合Schema
         fields = [
@@ -242,7 +254,7 @@ class MilvusKB(KnowledgeBase):
         # 使用原有的逻辑（兼容模式））
         config_dict = get_embedding_config(embed_info)
         return OtherEmbedding(
-            model=config_dict.get("model"),
+            model=config_dict.get("model") or config_dict.get("name"),
             base_url=config_dict.get("base_url"),
             api_key=config_dict.get("api_key"),
         )

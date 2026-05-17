@@ -1,10 +1,10 @@
 
 <div align="center">
-<h1>语析 - 基于大模型的知识库与知识图谱智能体开发平台</h1>
+<h1>小梁 - 基于大模型的知识库与知识图谱智能体开发平台</h1>
 
-[![](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=ffffff)](https://github.com/xerrors/Yuxi/blob/main/docker-compose.yml)
-[![](https://img.shields.io/github/issues/xerrors/Yuxi?color=F48D73)](https://github.com/xerrors/Yuxi/issues)
-[![License](https://img.shields.io/github/license/bitcookies/winrar-keygen.svg?logo=github)](https://github.com/xerrors/Yuxi/blob/main/LICENSE)
+[![](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=ffffff)](https://liqun.wv1344.top/blob/main/docker-compose.yml)
+[![](https://img.shields.io/github/issues/xerrors/Yuxi?color=F48D73)](https://liqun.wv1344.top/issues)
+[![License](https://img.shields.io/github/license/bitcookies/winrar-keygen.svg?logo=github)](https://liqun.wv1344.top/blob/main/LICENSE)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-blue.svg)](https://deepwiki.com/xerrors/Yuxi)
 [![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/xerrors/Yuxi)
 [![demo](https://img.shields.io/badge/demo-00A1D6.svg?style=flat&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1DF14BTETq/)
@@ -27,7 +27,7 @@
 - **平台与工程化**：Vue + FastAPI 架构，支持暗黑模式、Docker 与生产级部署
 
 
-## 你可以用语析做什么？
+## 你可以用小梁做什么？
 
 - 构建 **面向真实业务的 RAG + 知识图谱智能体**
 - 将 PDF / Word / Markdown / 图片快速转化为可推理的知识库
@@ -64,7 +64,7 @@
 
 ### 修复
 
-- 修复 Lightrag 知识库修改配置后，模型没有切换的 bug [#580](https://github.com/xerrors/Yuxi/issues/580)
+- 修复 Lightrag 知识库修改配置后，模型没有切换的 bug [#580](https://liqun.wv1344.top/issues/580)
 - 修复数据库获取接口未过滤文件字段而导致的数据包过大的情况
 - 修复 Thread 未绑定 agent_config_id 导致的历史对话切换后上下文配置错乱的问题
 
@@ -97,7 +97,7 @@
 克隆代码，并初始化
 
 ```
-git clone --branch v0.6.1 --depth 1 https://github.com/xerrors/Yuxi.git
+git clone --branch v0.6.1 --depth 1 https://liqun.wv1344.top.git
 cd Yuxi
 
 # Linux/macOS
@@ -208,7 +208,7 @@ docker compose up --build
 
 感谢所有贡献者的支持！
 
-<a href="https://github.com/xerrors/Yuxi/contributors">
+<a href="https://liqun.wv1344.top/contributors">
   <img src="https://contrib.rocks/image?repo=xerrors/Yuxi&max=100&columns=10" />
 </a>
 

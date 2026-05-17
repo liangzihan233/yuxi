@@ -3,7 +3,7 @@
     <div class="scene-card">
       <img :src="DoubaoAvatar" alt="scene" />
       <div>
-        <div class="title">{{ '访谈助手' }}</div>
+        <div class="title">{{ 'AI访谈助手' }}</div>
         <div class="desc">点击开始通话，进入实时对话</div>
       </div>
     </div>

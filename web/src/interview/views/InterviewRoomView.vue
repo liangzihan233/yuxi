@@ -20,7 +20,7 @@
         <p v-if="interview?.valid_from && interview?.valid_until" class="validity">
           有效期：{{ formatDate(interview.valid_from) }} 至 {{ formatDate(interview.valid_until) }}
         </p>
-        <p class="hint">本次访谈为语音对话形式，请确保麦克风设备正常</p>
+        <p class="hint">本次访谈为视频对话形式，请确保麦克风和摄像头设备正常</p>
       </div>
       <InvokeButton :loading="joining" @click="handleStart" />
     </div>
@@ -72,10 +72,17 @@
           </div>
 
           <div class=" audio-controller-stage">
-            <AudioLoading v-if="room.isAITalking" />
+            <span v-if="room.isAITalking">AI 说话中</span>
             <span v-else-if="room.isAIThinking">AI 思考中</span>
             <span v-else>AI 在线</span>
-            <button v-if="room.currentSceneConfig.isInterruptMode && isAudioPublished && room.isAITalking" @click="interruptAgent">打断</button>
+            <button
+              v-if="room.currentSceneConfig.isInterruptMode && isAudioPublished && room.isAITalking"
+              class="interrupt-btn"
+              @click="interruptAgent"
+            >
+              <span class="interrupt-text">打断</span>
+              <AudioLoading class="interrupt-loading" />
+            </button>
           </div>
         </div>
 
@@ -210,6 +217,13 @@ const ended = ref(false)
 const conversationRef = ref<HTMLDivElement>()
 const isAiPrimary = ref(false)
 
+async function scrollConversationToBottom() {
+  await nextTick()
+  const container = conversationRef.value
+  if (!container) return
+  container.scrollTop = container.scrollHeight
+}
+
 const isMobileView = computed(() => isMobile())
 const sceneName = computed(() => room.currentSceneConfig.name || interview.value?.name || '语音访谈')
 const isAIReady = computed(() => room.msgHistory.length > 0)
@@ -232,12 +246,12 @@ const networkText = computed(() => {
 })
 
 function isBotMsg(msg: any) {
-  const botName = room.currentSceneConfig.botName || 'InterviewBot'
+  const botName = room.currentSceneConfig.botName || interview.value?.participant_info?.moderator?.name || 'InterviewBot'
   return msg.user === botName || msg.user?.includes('voiceChat_')
 }
 
 function isLoadingMsg(owner: string) {
-  const botName = room.currentSceneConfig.botName || 'InterviewBot'
+  const botName = room.currentSceneConfig.botName || interview.value?.participant_info?.moderator?.name || 'InterviewBot'
   return (owner === room.localUser.userId && room.isUserTalking) || ((owner === botName || owner?.includes('voiceChat_')) && room.isAITalking)
 }
 
@@ -355,13 +369,15 @@ async function handleStart() {
     })
     device.updateMediaInputs(mediaDevices)
 
+    const moderatorName = interview.value?.participant_info?.moderator?.name || 'InterviewBot'
+
     // 设置场景配置
     room.updateScene('interview')
     room.updateSceneConfig({
       interview: {
         id: 'interview',
         name: interview.value.name || '语音访谈',
-        botName: 'InterviewBot',
+        botName: moderatorName,
         isVision: false,
         isScreenMode: false,
         isInterruptMode: true,
@@ -455,14 +471,19 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => room.msgHistory.length,
-  async () => {
-    await nextTick()
-    if (conversationRef.value) {
-      conversationRef.value.scrollTop = conversationRef.value.scrollHeight - conversationRef.value.clientHeight
-    }
-  }
+  () => [room.msgHistory.length, room.isShowSubtitle],
+  ([length, isShowSubtitle]) => {
+    if (!isShowSubtitle || length === 0) return
+    scrollConversationToBottom()
+  },
+  { flush: 'post' }
 )
+
+watch(isJoined, (joined) => {
+  if (joined) {
+    scrollConversationToBottom()
+  }
+})
 
 watch([isVideoPublished, () => room.isFullScreen], setVideoPlayer)
 </script>
@@ -923,10 +944,43 @@ watch([isVideoPublished, () => room.isFullScreen], setVideoPlayer)
   left: 20px;
   bottom: 20px;
   z-index: 9;
-  padding: 5px 12px;
+  padding: 8px 12px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 10px 28px rgba(31, 35, 41, 0.12);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #1f2329;
+  font-size: 13px;
+
+  .interrupt-btn {
+    position: relative;
+    border: 1px solid rgba(22, 100, 255, 0.28);
+    background: rgba(22, 100, 255, 0.08);
+    color: #1664ff;
+    border-radius: 999px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+
+    &:hover {
+      background: rgba(22, 100, 255, 0.12);
+      border-color: rgba(22, 100, 255, 0.38);
+    }
+  }
+
+  .interrupt-loading {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    transform: scale(0.8);
+    pointer-events: none;
+  }
 }
 
 .modal-overlay {

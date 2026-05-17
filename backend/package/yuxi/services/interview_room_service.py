@@ -121,12 +121,15 @@ class InterviewRoomService:
 
         # 构建 System Prompt
         system_prompt = self._build_system_prompt(project, interview, flows)
+        moderator_info = interview.participant_info.get("moderator", {}) if interview.participant_info else {}
+        moderator_name = moderator_info.get("name") or "访谈主持人"
 
         # 构建 VoiceChat 配置
         voice_chat_config = self._build_voice_chat_config(
             room_id=room_id,
             user_id=user_id,
             system_prompt=system_prompt,
+            moderator_name=moderator_name,
         )
 
         # 调用火山引擎 StartVoiceChat
@@ -388,9 +391,23 @@ class InterviewRoomService:
         # --------------------------------------------------------------
         # 4. 组装最终 System Prompt
         # --------------------------------------------------------------
-        prompt = f"""你是一位专业的用户调研访谈主持人。请严格按照以下框架进行对话。
+        moderator_info = interview.participant_info.get("moderator", {}) if interview.participant_info else {}
+        moderator_name = moderator_info.get("name") or "专业的用户调研访谈主持人"
+        moderator_prompt = (moderator_info.get("system_prompt") or "").strip()
+        moderator_section = ""
+        if moderator_prompt:
+            moderator_section = f"""# 主持人角色设定
+- 主持人名称：{moderator_name}
+- 主持人角色提示词：
+{moderator_prompt}
 
-{interview_info}
+请你在整个访谈过程中严格以该主持人角色的人设、语气、表达习惯与提问方式进行对话，但仍需遵守下述访谈目标与流程约束。
+
+"""
+
+        prompt = f"""你是一位{moderator_name}。请严格按照以下框架进行对话。
+
+{moderator_section}{interview_info}
 
 {project_context}
 
@@ -530,6 +547,7 @@ class InterviewRoomService:
         room_id: str,
         user_id: str,
         system_prompt: str,
+        moderator_name: str = "访谈主持人",
     ) -> dict[str, Any]:
         """构建 StartVoiceChat 的请求体"""
         return {

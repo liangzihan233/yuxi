@@ -615,6 +615,41 @@ class SubAgent(Base):
         return spec
 
 
+class RoleCard(Base):
+    """RoleCard 模型 - 与 SubAgent 相同结构，但独立存储"""
+
+    __tablename__ = "role_cards"
+
+    name = Column(String(128), primary_key=True, comment="唯一标识")
+    description = Column(Text, nullable=False, comment="描述")
+    system_prompt = Column(Text, nullable=False, comment="系统提示词")
+    tools = Column(JSON, nullable=False, default=list, comment="工具名称列表")
+    model = Column(String(128), nullable=True, comment="可选的模型覆盖")
+    enabled = Column(Boolean, nullable=False, default=True, comment="是否启用")
+
+    is_builtin = Column(Boolean, nullable=False, default=False, comment="是否内置")
+
+    created_by = Column(String(100), nullable=True)
+    updated_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "system_prompt": self.system_prompt,
+            "tools": self.tools or [],
+            "model": self.model,
+            "enabled": bool(self.enabled),
+            "is_builtin": bool(self.is_builtin),
+            "created_by": self.created_by,
+            "updated_by": self.updated_by,
+            "created_at": format_utc_datetime(self.created_at),
+            "updated_at": format_utc_datetime(self.updated_at),
+        }
+
+
 class APIKey(Base):
     """API Key 模型"""
 

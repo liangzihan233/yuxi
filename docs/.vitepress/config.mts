@@ -6,7 +6,7 @@ import markdownItTaskCheckbox from 'markdown-it-task-checkbox'
 export default defineConfig({
   lang: 'zh-CN',
   title: "Yuxi",
-  description: "语析",
+  description: "小梁",
   base: '/Yuxi/',
   ignoreDeadLinks: [
     /localhost/,
@@ -74,7 +74,7 @@ export default defineConfig({
     ],
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/xerrors/Yuxi' }
+      { icon: 'github', link: 'https://liqun.wv1344.top' }
     ],
 
     footer: {
@@ -83,7 +83,7 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/xerrors/Yuxi/edit/main/docs/:path',
+      pattern: 'https://liqun.wv1344.top/edit/main/docs/:path',
       text: '在 GitHub 上编辑此页'
     },
 

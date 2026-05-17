@@ -211,6 +211,22 @@ class PostgresManager(metaclass=SingletonMeta):
             "ALTER TABLE IF EXISTS skills ADD COLUMN IF NOT EXISTS is_builtin BOOLEAN NOT NULL DEFAULT FALSE",
             "ALTER TABLE IF EXISTS skills ADD COLUMN IF NOT EXISTS content_hash VARCHAR(128)",
             "ALTER TABLE IF EXISTS subagents ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE",
+            """
+            CREATE TABLE IF NOT EXISTS role_cards (
+                name VARCHAR(128) PRIMARY KEY,
+                description TEXT NOT NULL,
+                system_prompt TEXT NOT NULL,
+                tools JSONB NOT NULL DEFAULT '[]'::jsonb,
+                model VARCHAR(128),
+                enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                is_builtin BOOLEAN NOT NULL DEFAULT FALSE,
+                created_by VARCHAR(100),
+                updated_by VARCHAR(100),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_role_cards_updated_at ON role_cards(updated_at DESC)",
             "ALTER TABLE IF EXISTS conversations ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN NOT NULL DEFAULT FALSE",
             "ALTER TABLE IF EXISTS mcp_servers ADD COLUMN IF NOT EXISTS env JSONB",
             """

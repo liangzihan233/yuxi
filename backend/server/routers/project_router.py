@@ -72,6 +72,7 @@ class InterviewCreate(BaseModel):
     valid_until: str | None = None
     max_participants: int = 10
     linked_flows: list[int]
+    moderator_ids: list[str] = []
 
 
 class InterviewStatusUpdate(BaseModel):

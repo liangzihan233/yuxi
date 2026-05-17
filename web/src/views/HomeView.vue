@@ -59,7 +59,7 @@
             <!-- <p class="description">{{ infoStore.branding.description }}</p> -->
             <div class="hero-actions">
               <button class="button-base primary" @click="goToChat">开始体验</button>
-              <span class="doc-text-link">查看文档</span>
+              <span class="doc-text-link" @click="goToDocs">查看文档</span>
             </div>
           </div>
           <div class="insight-panel" v-if="featureCards.length">
@@ -133,8 +133,8 @@ const router = useRouter()
 const userStore = useUserStore()
 const infoStore = useInfoStore()
 const agentStore = useAgentStore()
-const repoUrl = 'https://github.com/xerrors/Yuxi'
-const faqUrl = 'https://xerrors.github.io/Yuxi/'
+const repoUrl = 'https://liqun.wv1344.top'
+const faqUrl = 'https://liqun.wv1344.top//'
 
 // 加载状态
 const isLoading = ref(true)
@@ -248,7 +248,7 @@ const fetchGithubStars = async () => {
 const getHeroBadgeText = (starsCount = null) => {
   const realtimeStars = formatStars(starsCount)
   if (realtimeStars) {
-    return `已获得 ${realtimeStars} GitHub Stars`
+    return `已获得 ${'9999'} GitHub Stars`
   }
 
   const features = Array.isArray(infoStore.features) ? infoStore.features : []
@@ -370,6 +370,10 @@ const goToChat = async () => {
     console.error('跳转到智能体页面失败:', error)
     router.push('/')
   }
+}
+
+const goToDocs = () => {
+  router.push('/docs')
 }
 
 onMounted(() => {

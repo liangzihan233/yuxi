@@ -9,6 +9,7 @@ from server.routers.department_router import department
 from server.routers.mcp_router import mcp
 from server.routers.project_router import projects_router
 from server.routers.interview_room_router import interview_room_router
+from server.routers.rolecard_router import rolecard_router
 from server.routers.skill_router import skills
 from server.routers.subagent_router import subagents_router
 from server.routers.system_router import system
@@ -35,6 +36,7 @@ router.include_router(tasks)  # /api/tasks/* 后台任务查询与管理
 router.include_router(mcp)  # /api/system/mcp-servers/* MCP 服务管理
 router.include_router(skills)  # /api/system/skills/* Skills 管理
 router.include_router(subagents_router)  # /api/system/subagents/* 子智能体管理
+router.include_router(rolecard_router)  # /api/system/roleCard/* 角色卡管理
 router.include_router(tools)  # /api/system/tools/* 工具列表与配置
 router.include_router(apikey_router)  # /api/apikey/* API Key 管理
 router.include_router(filesystem_router)  # /api/viewer/filesystem/* 工作台文件系统视图

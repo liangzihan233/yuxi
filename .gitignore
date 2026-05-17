@@ -13,6 +13,8 @@ dist
 node_modules
 
 ### common gitignore
+web/dist.zip
+.pnpm-home
 .DS_Store
 .env
 .env.prod

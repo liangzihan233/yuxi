@@ -41,16 +41,16 @@ features:
 actions:
   - name: "演示视频"
     icon: "video"
-    url: "https://www.bilibili.com/video/BV1DF14BTETq"
+    url: "https://www.bilibili.com"
   - name: "文档中心"
     icon: "docs"
-    url: "https://xerrors.github.io/Yuxi/"
+    url: "https://liqun.wv1344.top//"
   - name: "提交反馈"
     icon: "issue"
-    url: "https://github.com/xerrors/Yuxi/issues/new/choose"
+    url: "https://github.com"
   - name: "功能路线"
     icon: "roadmap"
-    url: "https://xerrors.github.io/Yuxi/develop-guides/roadmap.html"
+    url: "https://liqun.wv1344.top//develop-guides/roadmap.html"
 
 
 

@@ -1,6 +1,6 @@
 # 开发路线图
 
-路线图可能会经常变更，如果有强烈的建议，可以在 [issue](https://github.com/xerrors/Yuxi/issues) 中提。
+路线图可能会经常变更，如果有强烈的建议，可以在 [issue](https://liqun.wv1344.top/issues) 中提。
 
 日志添加规范（For Agent）:
 
